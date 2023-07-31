@@ -15,70 +15,89 @@ Most bioinformatics program work best in a linux environment and it is worthwhil
 
 Anaconda is a python-based package manager, that makes it easy to download and handle packages required for bioinformatics analysis. Open terminal (for Mac) or the ubuntu terminal (for Windows) and copy the following commands to execute. Note that lines containing comments begin with a '#' symbol, indicating the system to not execute the particular line. Anything within the grey box that does not begin with a '#' is the actual code.
 
+TIP: if you don't know what a specific shell command (that is programming language we are using today) does or what the different flags indicate you can look it up in the manual, for example:
+```shell
+man wget
+```
+
 ### B.1.a For Windows
 ```shell
 #this is an example for a comment
 #downloading the package
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-
-#installing conda
-bash Miniconda3-latest-Linux-x86_64.sh
-
-#initialise the shell; approve license and initialisation
-source ~/.bashrc
-
-#check if installation is successful; on execution should produce a list of installed packages
-conda list
-
-##TIP: if you don't know what a specific shell command does or what the different flags indicate you can look it up in the manual, for example
-man wget
 ```
+
+Installing conda for linux. Approve license and initialisation by entering y in the terminal when prompted.
+```shell
+bash Miniconda3-latest-Linux-x86_64.sh
+```
+
+Initialise the shell so it recognises conda.
+```shell
+source ~/.bashrc
+```
+
+Check if installation is successful; on execution should produce a list of installed packages.
+```shell
+conda list
+```
+
 
 ### B.1.b For Mac
 ```shell
 #downloading the package
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh
+```
 
-#installing; approve license and initlisation
+Iinstalling minuconda for Mac. Approve license and initialisation by entering y in the terminal when prompted.
+```shell
 bash Miniconda3-latest-MacOSX-x86_64.sh
 ```
 
-Once, this is done, all steps are common henceforth, regardless of the operating system.
+Once this is done, all steps are common henceforth, regardless of the operating system.
 
 ## B.2 Installing required packages
-We will now set up an environment using conda that will contain all the necessary packages need for our analysis.
+We will now set up an environment using conda that will contain all the necessary packages need for our analysis. The best way to work with conda is to create "environments" for different projects. Each environment should contain the necessary programs necessary for the project and is accessible only for that project. Once this is created, you can enter or exit the environment by "activating" or "deactivating" it.
 
 ```shell
 #creating an environment called csmb_rnaSeq
 conda create --name csmb_rnaSeq
+```
 
-#to enter the environment, we must activate it as follows
+To enter the environment, we must activate it as follows.
+```shell
 conda activate csmb_rnaSeq
+```
 
-#installing the packages cutadapt fastqc and kallisto; enter y when prompted for installing dependencies
+Installing the packages cutadapt fastqc and kallisto. Enter y when prompted for installing other packages that are needed as dependencies.
+```shell
 conda install -c bioconda cutadapt fastqc kallisto
 ```
 
 ## B.3 Creating directories
-In a linux environment, a folder is called a directory. We will now create some directories that will contain our files. $HOME in the following code chunk refers to the path of your home directory is located.  
+In a linux environment, a folder is called a directory. We will now create some directories that will contain our files. $HOME in the following code chunk refers to the path of your home directory.
 
 ```shell
-#to understand where $HOME is located, ie the file path, try the following
+#to understand where $HOME is located, ie the directory path, try the following
 printenv HOME
+```
 
-#mkdir is the command for creating a directory; here we are creating 6 directories
+mkdir is the command for creating a directory; here we are creating 6 new directories.
+```shell
 mkdir $HOME/csmb_rnaSeq $HOME/csmb_rnaSeq/1_rawData $HOME/csmb_rnaSeq/2_reference $HOME/csmb_rnaSeq/3_cutadapt $HOME/csmb_rnaSeq/4_fastqc $HOME/csmb_rnaSeq/5_kallisto_quant
 ```
 
 # C. Downloading data
 ## C.1 Raw Data
-We will now start with the pipeline for RNA-seq analysis. We will execute the pipeline for only one sample, so we can complete all steps within this session. For the next session, I will hand you the final output files from all six samples necessary for further analysis. If you want to execute the pipeline for all six samples yourself, you can take a look at the bonus section once you have carried out all the step.
+We will now start with the pipeline for RNA-seq analysis. We will execute the pipeline for only one sample, so we can complete all steps within this session. For the next session, I will upload  the final output files from all six samples necessary for further analysis on GitHub. If you want to execute the pipeline for all six samples yourself, you can take a look at the bonus section once you have carried out all the remaining steps.
 
 ```shell
 #changing the directory
 cd $HOME/csmb_rnaSeq/1_rawData
+```
 
-#dowloading the raw fastq file
+Downloading the raw fastq file from NCBI's SRA.
+```shell
 curl -L ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR347/001/SRR3471621/SRR3471621.fastq.gz -o SRR3471621_GSM2141236_AF11_L2_Homo_sapiens_RNA-Seq.fastq.gz
 ```
 
@@ -88,22 +107,28 @@ We will be using the human transcriptome as our reference to quantify the number
 ```shell
 #changing directory
 cd $HOME/csmb_rnaSeq/2_reference
+```
 
-#downloading the reference transcriptome from Ensembl
+Downloading the reference transcriptome from Ensembl.
+```shell
 curl -L ftp://ftp.ensembl.org/pub/release-110/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz -o Homo_sapiens.GRCh38.cdna.all.fa.gz
 ```
 
 # D. Trimming adapter sequences
-We will use cutadapt, a program that can trim reads from a next-generation sequencer to get rid of adapter sequences that maybe present in the downloaded reads.
+We will use cutadapt, a program that can trim reads from a next-generation sequencer to get rid of adapter sequences that maybe present in our dataset.
 
 ```shell
 #changing directory
 cd $HOME/csmb_rnaSeq  
+```
 
-#trimming adapters
+Trimming adapters with cutadapt. Illumina has standard adapter sequences that are available online; here we are providing the adapter sequence with the -a parameter.
+```shell
 cutadapt -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -o 3_cutadapt/SRR3471621_trimmed.fastq.gz 1_rawData/SRR3471621_GSM2141236_AF11_L2_Homo_sapiens_RNA-Seq.fastq.gz
+```
 
-##TIP: for specific programs that you download, the help page is generally accessible by typing; you can also look up the manual online
+TIP: for specific programs that you download, the help page is generally accessible by typing the following. You can also look up the manual online.
+```shell
 cutadapt -help
 ```
 
@@ -112,14 +137,14 @@ Once we have trimmed the adapter sequences, we should check if there any issues 
 
 ```shell
 #executing fastqc
-fastqc $HOME/csmb_rnaSeq/3_cutadapt/SRR3471621_trimmed.fastq.gz -t 16 -o $HOME/csmb_rnaSeq/ 4_fastqc/
+fastqc $HOME/csmb_rnaSeq/3_cutadapt/SRR3471621_trimmed.fastq.gz -t 16 -o $HOME/csmb_rnaSeq/4_fastqc/
 ```
 
 # F. Indexing the transcriptome
-Most bioinformatics programs working with entire genomes and transciptomes require that you index the refernece file. Indexing is done to ensure the program can acess different chromosomal locations easily, thereby hastening the process. The indexing algorithm varies between programs and even between versions of the same program, so it is advisable to index with the version of program you are using.
+Most bioinformatics programs working with entire genomes and transcriptomes require that you index the reference file. Indexing is done to ensure the program can access different chromosomal locations easily, thereby hastening the process. The indexing algorithm varies between programs and even between versions of the same program, so it is advisable to index with the version of program you are currently using.
 
 ```shell
-kallisto index -i $HOME/csmb_rnaSeq/2_reference/hg38_Index $HOME/csmb_rnaSeq/2_reference/ Homo_sapiens.GRCh38.cdna.all.fa.gz
+kallisto index -i $HOME/csmb_rnaSeq/2_reference/hg38_Index $HOME/csmb_rnaSeq/2_reference/Homo_sapiens.GRCh38.cdna.all.fa.gz
 ```
 
 # G. Pseudoalignment with kallisto
@@ -133,15 +158,19 @@ Congratulations! You have now completed the pipeline for one sample!
 
 # Bonus section
 
-If you are interested in executing the whole pipeline for all six samples, I have a script that will do it for you (csmb_rnaseq.sh). You can open this file with any text editor like NotePad or Text Editor. The comments indicate what every line does. The script assumes you have carried out all the steps until section C.  
+If you are interested in executing the whole pipeline for all six samples, I have a script that will do it for you (csmb_rnaseq.sh). You can open this file with any text editor like NotePad or Text Editor. The comments indicate what every line does. The script assumes you have carried out all the steps until section C to work properly.  
 
 ```shell
 #changing directory
 cd $HOME/csmb_rnaSeq
+```
 
-#downloading the script
-wget <insert link>
+downloading the script
+```shell
+wget https://github.com/mridna/csmb2023_RNASeq/blob/main/day1/csmb_rnaseq.sh
+```
 
 #executing the script
+```shell
 bash csmb_rnaseq.sh
 ```
