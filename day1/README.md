@@ -172,7 +172,7 @@ cd $HOME/csmb_rnaSeq
 
 downloading the script
 ```shell
-wget https://github.com/mridna/csmb2023_RNASeq/blob/main/day1/csmb_rnaseq.sh
+wget https://raw.githubusercontent.com/mridna/csmb2023_RNASeq/main/day1/csmb_rnaseq.sh
 ```
 
 #executing the script
