@@ -154,6 +154,11 @@ We will finally quanity the abundance of the genes expressed using kallisto. Unl
 kallisto quant -i $HOME/csmb_rnaSeq/2_reference/hg38_Index –o $HOME/csmb_rnaSeq/5_kallisto_quant --single -l 100 -s 2  $HOME/csmb_rnaSeq/3_cutadapt/SRR3471621_trimmed.fastq.gz
 ```
 
+Exiting the conda environment.
+```shell
+conda deactivate
+````
+
 Congratulations! You have now completed the pipeline for one sample!
 
 # Bonus section
