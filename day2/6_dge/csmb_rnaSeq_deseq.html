@@ -464,8 +464,15 @@ dds &lt;- dds[keep,]
 #setting control as the reference level for further analysis
 dds$Infection &lt;- relevel(dds$Infection, ref = c(&quot;Non-infected&quot;))
 
-#calculating DE
+#calculating DE; this includes the normalisation step
 dds.de &lt;- DESeq(dds)</code></pre>
+<p>To see what has happened at this step, let’s take a look at the reads
+before and after normalisation:</p>
+<pre class="r"><code>#fetching raw counts that was used as input
+head(counts(dds.de))
+
+#fetching read counts after normalisation for comparison
+head(counts(dds.de, normalized =T))</code></pre>
 </div>
 <div id="c.-quality-check-of-de-data" class="section level1">
 <h1>C. Quality check of DE data:</h1>
@@ -517,7 +524,10 @@ res.salm.de &lt;- merge(as.data.frame(res.salm.de), unique(TxDb[,c (&quot;gene_i
 res.salm.de &lt;- res.salm.de[order(res.salm.de$padj),]
 
 #how res.salm.de looks like after merging and sorting
-head(res.salm.de)</code></pre>
+head(res.salm.de)
+
+#writing to a file; you can open the exported file in Excel for example
+write.table(res.salm.de, &quot;de_genes.tsv&quot;, row.names = F, col.names = T, sep=&quot;\t&quot;, quote = F)</code></pre>
 <p>We have all the necessary information to do make some interesting
 plots. We will use the R package ggplot2 to help make plots pretty.We
 will begin with visualising the global expression patterns and the

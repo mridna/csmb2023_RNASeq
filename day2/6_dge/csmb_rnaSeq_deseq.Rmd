@@ -95,8 +95,19 @@ dds <- dds[keep,]
 #setting control as the reference level for further analysis
 dds$Infection <- relevel(dds$Infection, ref = c("Non-infected"))
 
-#calculating DE
+#calculating DE; this includes the normalisation step
 dds.de <- DESeq(dds)
+
+```
+
+To see what has happened at this step, let's take a look at the reads before and after normalisation:
+
+```{r}
+#fetching raw counts that was used as input
+head(counts(dds.de))
+
+#fetching read counts after normalisation for comparison
+head(counts(dds.de, normalized =T))
 
 ```
 
@@ -155,6 +166,9 @@ res.salm.de <- res.salm.de[order(res.salm.de$padj),]
 
 #how res.salm.de looks like after merging and sorting
 head(res.salm.de)
+
+#writing to a file; you can open the exported file in Excel for example
+write.table(res.salm.de, "de_genes.tsv", row.names = F, col.names = T, sep="\t", quote = F)
 ```
 
 We have all the necessary information to do make some interesting plots. We will use the R package ggplot2 to help make plots pretty.We will begin with visualising the global expression patterns and the extent of DE genes with the help of an MA plot. 
