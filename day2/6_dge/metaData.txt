@@ -1,0 +1,7 @@
+Run	Individual	Infection	Sample
+SRR3471622	AF11	Non-infected	cont_1
+SRR3471623	AF11	Salmonella	salm_1
+SRR3471625	AF17	Non-infected	cont_2
+SRR3471626	AF17	Salmonella	salm_2
+SRR3471628	AF19	Non-infected	cont_3
+SRR3471629	AF19	Salmonella	salm_3

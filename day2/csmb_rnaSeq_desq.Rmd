@@ -1,0 +1,251 @@
+---
+title: "Introduction to Gene Expression -II"
+author: "Mridula Nandakumar"
+date: "2023-08-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval = F)
+```
+
+In this exercise, we will learn to analyse and interpret transcriptome data, focusing specifically on differential gene expression analysis. In the previous sessions, we downloaded publicly available data and used a RNA-seq pipeline that trimmed adapter sequences from the reads, checked quality and quantified the number of reads accounting for each transcript using kallisto. We pick up today's session here, where we will look at differential gene expression between macrophages stimulated with salmonella typhimurium and the uninfected control. We will try to understand which processes are differentially regulated between the two conditions. 
+
+You need R and RStudio for this workshop. You can download the R installer with the following link; make sure to download the right installer for your operating system (Windows/Mac). If you have already R installed, make sure it is updated to the latest version (4.3) to ensure all packages function without any errors. 
+https://ftp.acc.umu.se/mirror/CRAN/
+
+RStudio can be downloaded from here:
+https://posit.co/download/rstudio-desktop/
+
+Let's begin by installing the necessary packages. 
+
+```{r}
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install("EnsDb.Hsapiens.v86")
+BiocManager::install("DESeq2")
+BiocManager::install("clusterProfiler")
+BiocManager::install("org.Hs.eg.db")
+BiocManager::install("tximport")
+
+install.packages("ggplot2")
+install.packages("pheatmap")
+```
+
+Before we move further, let's create a folder to work from. On the desktop, create a folder called csmb_rnaSeq and within it another folder called 6_dge. Ensure that the abundance.tsv files from the 6 samples and the metaData.txt files are present in the folder 6_dge. You can download these files from the github page for this workshop, present under the "6_dge" folder. What is contained in the input  abundance files is transcript abundances, however this data needs to be converted into reads accounting for each gene expression (since multiple transcripts can account for a gene)
+
+# A. Importing data and setting up
+
+```{r}
+#setting the working directory
+setwd("~/Desktop/csmb_rnaSeq/6_dge/")
+
+#importing the metaData.txt file
+metaData <- read.table("metaData.txt", header = TRUE)
+
+#setting up the file names of the abundance.tsv files that need to be imported
+files <- paste(metaData$Run, "abundance.tsv", sep ="_")
+
+#setting the name of each file to the sample 
+names(files) <- metaData$Sample
+
+#loading the ensembl database for annotations
+library(EnsDb.Hsapiens.v86)
+
+#choosing the ensembl Human databse
+edb <- EnsDb.Hsapiens.v86
+
+#downloading information about the transcripts annotated in the human genome
+TxDb <- transcripts(edb, columns = c(listColumns(edb , "tx"), "gene_name"), return.type="DataFrame")
+
+#choosing only those columns that are of interest for us: "tx_id" (ensembl transcipt id) and "gene_id" (ensembl gene id)
+Tx2Gene <- TxDb[,c("tx_id","gene_id")]
+
+#tximport is a package to handle transcript abundances; loading this package
+library(tximport)
+
+#reading all 6 abundace files and matching the transript IDs with gene IDs
+txi.kallisto.tsv <- tximport(files, type = "kallisto", tx2gene = Tx2Gene, ignoreTxVersion = TRUE)
+
+#what's in txi.kallisto.tsv; check with 
+head(txi.kallisto.tsv)
+```
+
+# B. Differential gene expression (DGE):
+We will be using Deseq2, an R package very popular for DE analsyis. Briefly, these packages run a generalised linear model to check if the patterns of expression observed are a consequence of the treatment or condition, as compared to the control. The reads counts need to be normalised to proceed with differential expression. Normalisation is a very critical aspect of gene expression analysis, without which DE analysis is pretty meaningless. It accounts for variability in the number of reads (library size/sequencing depth), gene length and RNA composition that can bias results towards larger libraries, longer and highly expressed genes. Deseq2 uses a method called "median of ratios" to carry out normalisation.
+
+Now we will create an object that contains all the required input files and the generalised linear model we desire, in a format that is compatible with deseq2. We need to provide input information, along with the model to be run. For this run we are only using the infection condition as a variable.
+
+```{r}
+#loading the package
+library(DESeq2)
+
+#creating deseq object and specifying the variables for count data, metadata and the model
+dds <- DESeqDataSetFromTximport(txi=txi.kallisto.tsv, colData = metaData, design = ~ Infection)
+
+#get an overview of the object
+dds
+
+#eliminating lowly expressed genes: retaining only those rows with count >=2 in at least 4 samples; this will hasten the analysis
+keep <- rowSums(counts(dds) >= 2) >= 4
+
+#updating dds to remove genes with low expression
+dds <- dds[keep,]
+
+#setting control as the reference level for further analysis
+dds$Infection <- relevel(dds$Infection, ref = c("Non-infected"))
+
+#calculating DE
+dds.de <- DESeq(dds)
+
+```
+
+# C. Quality check of DE data:
+
+We will now do some quality checks to see if the design and execution of the experiment worked. To do this, we will obtain clustering information from a PCA plot. The expectation is that samples from similar treatments or populations would be more alike to each other. 
+
+```{r}
+#transforming the normalised read counts using regularised log
+rld <- rlog(dds.de, blind=TRUE)
+
+#PCA plot with Infection as the condition of interest
+plotPCA(rld, intgroup="Infection") 
+```
+
+Questions:
+1. How does the PCA plot match your expectation from this experiment? What does PC1 and PC2 explain?
+
+# D. Condition-specific analysis of DGE
+
+Now that we are done with our QC, we can proceed with DE analysis for each condition. We start with Salmonella infections.
+By default, summary() takes the cut off as adjusted p-value \<0.1. We will now specify that we want results that are signficant for padj \<0.05. Look out for the differences in number of genes reported.
+
+```{r}
+#specifying the threshold for significance using the "alpha" parameter
+res.salm <- results(dds.de, alpha=0.05, contrast = c("Infection", "Salmonella", "Non-infected"))
+summary(res.salm)
+
+#getting a count of the number of genes with padj <0.05
+sum(res.salm$padj < 0.05, na.rm=TRUE)
+```
+
+Questions:
+
+1. How many genes are differentially expressed? OF that, how many are up-regualted and how many are down-regulated?
+We will now extract the significant genes for further analyses.
+
+```{r}
+#subsetting all significant genes into a separate object
+res.salm.de <- subset(res.salm, res.salm$padj < 0.05)
+```
+
+You would have noticed that the entries are present as Ensmebl gene IDs (eg:ENSG00000139618) instead of gene names (eg:BRCA2), which is a bit meaningless to us. So additionally, we will also match the gene IDs to gene names, which maybe easier to read. 
+
+We will now proceed to map gene names to the ensembl gene IDs. 
+
+```{r}
+#adding ensembl gene id (which is the rowname for res.salm.de) as a column
+res.salm.de$gene_id <- rownames(res.salm.de)
+
+#merging by the common column "ensembl_gene_id"
+res.salm.de <- merge(as.data.frame(res.salm.de), unique(TxDb[,c ("gene_id", "gene_name")]), by="gene_id", all=F)
+
+#sorting by padj
+res.salm.de <- res.salm.de[order(res.salm.de$padj),]
+
+#how res.salm.de looks like after merging and sorting
+head(res.salm.de)
+```
+
+We have all the necessary information to do make some interesting plots. We will use the R package ggplot2 to help make plots pretty.We will begin with visualising the global expression patterns and the extent of DE genes with the help of an MA plot. 
+
+```{r}
+library(ggplot2)
+
+#MA plot for salmonella infection
+plotMA(res.salm)
+
+```
+
+Questions:
+
+1.. What are the most interesting genes? 
+
+Next we can present similar information in the form of a volcano plot. Since we have many genes that are DE, we can limit the number of points we highlight to log2 fold change >=2.
+
+```{r}
+#we will create an additional column that is logical to help colour points 
+#only padj < 0.05 and log 2 fold change ≥ 2 in either direction will be coloured
+res.salm$volc <- with(res.salm, padj < 0.05 & abs(log2FoldChange) >=2)
+
+#plotting with ggplot
+ggplot(as.data.frame(res.salm), aes(x=log2FoldChange, y= -log10(padj), color= volc)) + geom_point () + scale_color_manual(values= c("black","red"))
+```
+
+Questions:
+
+1. Where are the most interesting genes present? What colour is it indicated in? How is the MA plot different from a volcano plot?
+
+Heatmaps for genes are normally plotted using z scores (you can google what it is). We will use the rlog transformed read count for this. 
+
+```{r}
+#converting to a suitable format
+rld_mat <- assay(rld)
+
+#calculating the z score for rld_mat
+rld.z <- t(scale(t(rld_mat), center = T, scale = T))
+```
+
+We will now perform some formatting, so we have all information needed for the heatmap. 
+
+```{r}
+#setting labels to the column names of rld.z
+colnames(rld.z) <-  paste(rld$Individual, rld$Infection, sep="-")
+
+#subsetting rld.z to have only the DEGs
+top.z <- rld.z[rownames(rld.z) %in% res.salm.de$gene_id,]
+
+#ordering content by ensembl gene ids
+top.z <- top.z[order(rownames(top.z)),]
+
+
+#setting labels row names of top.z to be gene names instead of ensembl ids
+rownames(top.z) <- res.salm.de$gene_name
+
+#loading pheatmap
+library(pheatmap)
+
+#plotting heat map of z scores for top 50 DEGs
+pheatmap(top.z[1:50,], color = colorRampPalette(c("navy", "white", "firebrick3"))(50))
+```
+
+Questions:
+
+1. How do you interpret this plot? What does the colour scale indicate?
+
+# E. Functional analysis:
+
+Finally, let's look at some of the function of these DEGs. For the DEGs, it would be interesting to see if any particular class of genes are enriched. There are many ways and many packages that will help with this.
+We will look at GO term enrichment with the package clusterprofiler, for which we will use annotation from the package org.Hs.eg.db. We will check if the DEGs are enriched for any gene categories in comparison to the total genes we included in our analysis. To find out details about any GO term, enter the GO ID here: <http://geneontology.org/> .
+
+```{r}
+#loading packages
+library(clusterProfiler)
+library(org.Hs.eg.db)
+```
+
+We will ontology terms from the category of "Biological Processes" (BP). 
+
+```{r}
+#calculating enrichment scores for the DEGs in salmonella infection; will take a few seconds
+salm.go <- enrichGO(res.salm.de$gene_id, universe=row.names(dds) ,OrgDb = org.Hs.eg.db, ont="BP", pvalueCutoff = 0.05, pAdjustMethod="BH", keyType = "ENSEMBL")
+
+#inspect object
+head(salm.go)
+
+#plotting go terms; limiting to top 20 categories
+dotplot(salm.go, showCategory=20)
+```
+
+Questions:
+1. What biological processes do you think are differentially regulated between the two conditions?
